@@ -1,4 +1,3 @@
-using System;
 using CppSharp.AST;
 using CppSharp.Generators;
 using CppSharp.Passes;
@@ -17,6 +16,7 @@ namespace CppSharp.Tests
         public override void SetupPasses(Driver driver)
         {
             driver.Options.GeneratePropertiesAdvanced = true;
+            driver.Options.GenerateInterfacesForMultipleInheritance = true;
         }
 
         public override void Preprocess(Driver driver, ASTContext ctx)

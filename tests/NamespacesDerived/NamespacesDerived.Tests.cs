@@ -5,6 +5,14 @@ using NUnit.Framework;
 public class NamespaceDerivedTests
 {
     [Test]
+    public void TestCodeGeneration()
+    {
+        using (new HasSecondaryAbstractBaseInAnotherModule())
+        {
+        }
+    }
+
+    [Test]
     public void TestNonRenamedMethod()
     {
         var derived = new Derived();

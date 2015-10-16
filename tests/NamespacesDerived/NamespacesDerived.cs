@@ -17,6 +17,7 @@ namespace CppSharp.Tests
         {
             driver.Options.GenerateDefaultValuesForArguments = true;
             driver.Options.GeneratePropertiesAdvanced = true;
+            driver.Options.GenerateInterfacesForMultipleInheritance = true;
         }
 
         public override void Preprocess(Driver driver, ASTContext ctx)

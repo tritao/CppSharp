@@ -69,3 +69,10 @@ public:
     HasVirtualInDependency* managedObject;
     int callManagedOverride();
 };
+
+class DLL_API HasSecondaryAbstractBaseInAnotherModule : public Derived, public Abstract
+{
+public:
+    HasSecondaryAbstractBaseInAnotherModule();
+    void abstractFunction();
+};
