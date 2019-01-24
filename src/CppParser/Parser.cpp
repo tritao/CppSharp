@@ -39,6 +39,7 @@
 #include <clang/Parse/ParseAST.h>
 #include <clang/Sema/Sema.h>
 #include <clang/Sema/SemaConsumer.h>
+#include <clang/Frontend/ASTUnit.h>
 #include <clang/Frontend/Utils.h>
 #include <clang/Driver/Driver.h>
 #include <clang/Driver/ToolChain.h>
@@ -240,32 +241,20 @@ void Parser::Setup()
 
     using namespace clang;
 
-    std::vector<const char*> args;
-    args.push_back("-cc1");
-
-    for (unsigned I = 0, E = opts->Arguments.size(); I != E; ++I)
-    {
-        const auto& Arg = opts->Arguments[I];
-        args.push_back(Arg.c_str());
-    }
-
+    // Create Clang compiler instance.
     c.reset(new CompilerInstance());
     c->createDiagnostics();
 
-    CompilerInvocation* Inv = new CompilerInvocation();
-    CompilerInvocation::CreateFromArgs(*Inv, args.data(), args.data() + args.size(),
-      c->getDiagnostics());
-    c->setInvocation(std::shared_ptr<CompilerInvocation>(Inv));
-    c->getLangOpts() = *Inv->LangOpts;
-
-    auto& TO = Inv->TargetOpts;
+    // Setup the target triple.
+    auto& TO = Invocation->TargetOpts;
     targetABI = ConvertToClangTargetCXXABI(opts->abi);
 
     if (opts->targetTriple.empty())
         opts->targetTriple = llvm::sys::getDefaultTargetTriple();
+
     TO->Triple = llvm::Triple::normalize(opts->targetTriple);
 
-    TargetInfo* TI = TargetInfo::CreateTargetInfo(c->getDiagnostics(), TO);
+    auto TI = TargetInfo::CreateTargetInfo(c->getDiagnostics(), TO);
     if (!TI)
     {
         // We might have no target info due to an invalid user-provided triple.
@@ -276,16 +265,29 @@ void Parser::Setup()
     }
 
     assert(TI && "Expected valid target info");
-
     c->setTarget(TI);
+
+    // Setup command line arguments.
+    std::vector<const char*> args;
+    args.push_back("-cc1");
+
+    for (unsigned I = 0, E = opts->Arguments.size(); I != E; ++I)
+    {
+        const auto& Arg = opts->Arguments[I];
+        args.push_back(Arg.c_str());
+    }
+
+    Invocation.reset(new CompilerInvocation());
+    CompilerInvocation::CreateFromArgs(*Invocation, args.data(),
+        args.data() + args.size(), c->getDiagnostics());
+    c->setInvocation(Invocation);
+    c->getLangOpts() = *Invocation->LangOpts;
 
     c->createFileManager();
     c->createSourceManager(c->getFileManager());
 
+    // Setup header search options.
     auto& HSOpts = c->getHeaderSearchOpts();
-    auto& PPOpts = c->getPreprocessorOpts();
-    auto& LangOpts = c->getLangOpts();
-
     if (opts->noStandardIncludes)
     {
         HSOpts.UseStandardSystemIncludes = false;
@@ -320,6 +322,8 @@ void Parser::Setup()
         HSOpts.AddPath(s, frontend::System, false, false);
     }
 
+    // Setup preprocessor options.
+    auto& PPOpts = c->getPreprocessorOpts();
     for (unsigned I = 0, E = opts->Defines.size(); I != E; ++I)
     {
         const auto& define = opts->Defines[I];
@@ -332,17 +336,30 @@ void Parser::Setup()
         PPOpts.addMacroUndef(undefine);
     }
 
+    PPOpts.DetailedRecord = true;
+
+    c->createPreprocessor(TU_Complete);
+
+    Preprocessor& PP = c->getPreprocessor();
+    PP.getBuiltinInfo().initializeBuiltins(PP.getIdentifierTable(),
+        PP.getLangOpts());
+
+    // Setup language options.
+    auto& LangOpts = c->getLangOpts();
 #ifdef _MSC_VER
     if (opts->microsoftMode)
     {
         LangOpts.MSCompatibilityVersion = opts->toolSetToUse;
-        if (!LangOpts.MSCompatibilityVersion) LangOpts.MSCompatibilityVersion = 1700;
+        if (!LangOpts.MSCompatibilityVersion)
+            LangOpts.MSCompatibilityVersion = 1700;
     }
 #endif
 
+    // Setup a Clang driver toolchain so it can setup target-specific includes.
     llvm::opt::InputArgList Args(0, 0);
     clang::driver::Driver D("", TO->Triple, c->getDiagnostics());
     clang::driver::ToolChain *TC = nullptr;
+
     llvm::Triple Target(TO->Triple);
     switch (Target.getOS()) {
     // Extend this for other triples if needed, see clang's Driver::getToolChain.
@@ -363,15 +380,6 @@ void Parser::Setup()
                     /*IgnoreSysRoot=*/false);
         }
     }
-
-    // Enable preprocessing record.
-    PPOpts.DetailedRecord = true;
-
-    c->createPreprocessor(TU_Complete);
-
-    Preprocessor& PP = c->getPreprocessor();
-    PP.getBuiltinInfo().initializeBuiltins(PP.getIdentifierTable(),
-        PP.getLangOpts());
 
     c->createASTContext();
 }
@@ -4172,11 +4180,15 @@ ParserResult* Parser::ParseHeader(const std::vector<std::string>& SourceFiles)
     std::unique_ptr<::DiagnosticConsumer> DiagClient(new ::DiagnosticConsumer());
     c->getDiagnostics().setClient(DiagClient.get(), false);
 
-    DiagClient->BeginSourceFile(c->getLangOpts(), &c->getPreprocessor());
+    auto Unit = clang::ASTUnit::LoadFromCompilerInvocation(Invocation,
+        c->getPCHContainerOperations(), &c->getDiagnostics(), &c->getFileManager(),
+        /*OnlyLocalDecls=*/false,  /*CaptureDiagnostics=*/true);
 
-    ParseAST(c->getSema());
+    //DiagClient->BeginSourceFile(c->getLangOpts(), &c->getPreprocessor());
 
-    DiagClient->EndSourceFile();
+    //ParseAST(c->getSema());
+
+    //DiagClient->EndSourceFile();
 
     HandleDiagnostics(res);
 

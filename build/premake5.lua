@@ -5,7 +5,7 @@
 config = {}
 
 include "Helpers.lua"
-include "LLVM.lua"
+dofile "LLVM.lua"
 
 workspace "CppSharp"
 
@@ -28,10 +28,12 @@ workspace "CppSharp"
   group "Libraries"
     include (srcdir .. "/Core")
     include (srcdir .. "/AST")
+    --include (srcdir .. "/ASTViewer")
     include (srcdir .. "/CppParser")
     include (srcdir .. "/CppParser/Bindings")
     include (srcdir .. "/CppParser/Bootstrap")
     include (srcdir .. "/CppParser/ParserGen")
+    --include (srcdir .. "/Haxe")
     include (srcdir .. "/Parser")
     include (srcdir .. "/CLI")
     include (srcdir .. "/Generator")

@@ -165,6 +165,7 @@ private:
 
     int index;
     std::unique_ptr<clang::CompilerInstance> c;
+    std::shared_ptr<clang::CompilerInvocation> Invocation;
     clang::TargetCXXABI::Kind targetABI;
     llvm::LLVMContext LLVMCtx;
     std::unique_ptr<llvm::Module> LLVMModule;

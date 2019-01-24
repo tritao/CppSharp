@@ -1,21 +1,19 @@
 -- Setup the LLVM dependency directories
 
-LLVMRootDir = depsdir .. "/llvm/"
-
-local LLVMDirPerConfiguration = false
-
-local LLVMRootDirDebug = ""
-local LLVMRootDirRelease = ""
-
 require "scripts/LLVM"
 
-function SearchLLVM()
-  local basedir = path.getdirectory(_PREMAKE_COMMAND)
-  LLVMRootDirDebug = basedir .. "/scripts/" .. get_llvm_package_name(nil, "Debug")
-  LLVMRootDirRelease = basedir .. "/scripts/" .. get_llvm_package_name()
+local LLVMRootDir = depsdir .. "/llvm/"
 
-  if os.isdir(LLVMRootDirDebug) or os.isdir(LLVMRootDirRelease) then
-    LLVMDirPerConfiguration = true
+local basedir = path.getdirectory(_PREMAKE_COMMAND)
+local LLVMRootDirDebug = basedir .. "/scripts/" .. get_llvm_package_name(nil, "Debug")
+local LLVMRootDirRelease = basedir .. "/scripts/" .. get_llvm_package_name()
+
+function LLVMDirPerConfiguration()
+  return os.isdir(LLVMRootDirDebug) or os.isdir(LLVMRootDirRelease)
+end
+
+function SearchLLVM()
+  if LLVMDirPerConfiguration() then
     print("Using debug LLVM build: " .. LLVMRootDirDebug)
     print("Using release LLVM build: " .. LLVMRootDirRelease)
   elseif os.isdir(LLVMRootDir) then
@@ -38,7 +36,7 @@ end
 function SetupLLVMIncludes()
   local c = filter()
 
-  if LLVMDirPerConfiguration then
+  if LLVMDirPerConfiguration() then
     filter { "configurations:Debug" }
       includedirs
       {
